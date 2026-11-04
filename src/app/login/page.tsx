@@ -7,7 +7,7 @@ import { Blobs } from "@/components/Blobs";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  if (await usuarioAtual()) redirect("/inventario");
+  if (await usuarioAtual()) redirect("/mapa");
   const { next } = await searchParams;
   return (
     <div className="login-wrap">

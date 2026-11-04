@@ -123,7 +123,7 @@ export async function entrar(_prev: EstadoLogin | undefined, fd: FormData): Prom
   if (!u!.ativo) return { etapa: "email", erro: "Conta desativada. Fale com o Gerente Regional." };
 
   await criarSessao(u!.id);
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/inventario");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/mapa");
 }
 
 export async function logout(): Promise<void> {

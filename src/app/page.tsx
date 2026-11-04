@@ -5,5 +5,5 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const u = await usuarioAtual();
-  redirect(u ? "/inventario" : "/login");
+  redirect(u ? "/mapa" : "/login");
 }
