@@ -1,0 +1,140 @@
+"use client";
+import { useActionState, useState } from "react";
+import { DEVICES, STATUS } from "@/lib/devices";
+import { LINHAS, DISTRITOS, DISTRITO_CODIGOS } from "@/lib/estrutura";
+
+type Valores = {
+  id?: number; tipo?: string; numero_serie?: string; status?: string; distrito?: string; setor?: string | null;
+  medico_nome?: string | null; medico_crm?: string | null; clinica?: string | null;
+  endereco?: string | null; cidade?: string | null; cep?: string | null; observacao?: string | null;
+};
+type Acao = (prev: { erro?: string } | undefined, fd: FormData) => Promise<{ erro?: string } | undefined>;
+
+export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao; valores?: Valores; rotulo: string }) {
+  const [estado, submit, pendente] = useActionState(acao, undefined);
+  const [status, setStatus] = useState(valores.status ?? "instalado");
+  const [linha, setLinha] = useState(valores.distrito ? DISTRITOS[valores.distrito]?.linha ?? "" : "");
+  const [distrito, setDistrito] = useState(valores.distrito ?? "");
+  const [setor, setSetor] = useState(valores.setor ?? "");
+  const distritosDaLinha = DISTRITO_CODIGOS.filter((d) => DISTRITOS[d].linha === linha);
+  const setoresDoDistrito = distrito ? DISTRITOS[distrito]?.setores ?? [] : [];
+  const [endereco, setEndereco] = useState(valores.endereco ?? "");
+  const [cidade, setCidade] = useState(valores.cidade ?? "");
+  const [cepInfo, setCepInfo] = useState("");
+
+  // Preenche endereco e cidade a partir do CEP (ViaCEP). Se falhar, o usuario digita manualmente.
+  async function buscarCep(cep: string) {
+    const d = cep.replace(/\D/g, "");
+    if (d.length !== 8) return;
+    setCepInfo("Buscando CEP...");
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${d}/json/`);
+      const j = await r.json();
+      if (j.erro) { setCepInfo("CEP não encontrado. Preencha o endereço manualmente."); return; }
+      const rua = [j.logradouro, j.bairro].filter(Boolean).join(", ");
+      if (rua && !endereco) setEndereco(rua);
+      if (j.localidade) setCidade(j.uf ? `${j.localidade}/${j.uf}` : j.localidade);
+      setCepInfo("Endereço preenchido pelo CEP. Confira e complete o número.");
+    } catch {
+      setCepInfo("Não foi possível consultar o CEP. Preencha manualmente.");
+    }
+  }
+
+  const instalado = status === "instalado";
+
+  return (
+    <form action={submit} className="form">
+      {estado?.erro && <div className="erro">{estado.erro}</div>}
+      {valores.id && <input type="hidden" name="id" value={valores.id} />}
+
+      <div className="linha">
+        <label>
+          Device
+          <select name="tipo" required defaultValue={valores.tipo ?? ""}>
+            <option value="" disabled>Selecione</option>
+            {DEVICES.map((d) => <option key={d.key} value={d.key}>{d.nome} · {d.categoria}</option>)}
+          </select>
+        </label>
+        <label>
+          Número de série
+          <input name="numero_serie" required defaultValue={valores.numero_serie ?? ""} placeholder="Como está na etiqueta do aparelho" style={{ textTransform: "uppercase" }} />
+        </label>
+      </div>
+
+      <div className="linha">
+        <label>
+          Onde o aparelho está
+          <select name="status" required value={status} onChange={(e) => setStatus(e.target.value)}>
+            {STATUS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <h3>Estrutura</h3>
+      <div className="linha tres">
+        <label>
+          Linha
+          <select value={linha} onChange={(e) => { setLinha(e.target.value); setDistrito(""); setSetor(""); }} required>
+            <option value="" disabled>Selecione</option>
+            {Object.entries(LINHAS).map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+          </select>
+        </label>
+        <label>
+          Distrito
+          <select name="distrito" value={distrito} onChange={(e) => { setDistrito(e.target.value); setSetor(""); }} required disabled={!linha}>
+            <option value="" disabled>{linha ? "Selecione" : "Escolha a linha"}</option>
+            {distritosDaLinha.map((d) => <option key={d} value={d}>Distrito {Number(d.slice(4, 6)) * 100} · {d}</option>)}
+          </select>
+        </label>
+        <label>
+          Setor (opcional)
+          <select name="setor" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={!distrito}>
+            <option value="">{distrito ? "Sem setor / com o GD" : "Escolha o distrito"}</option>
+            {setoresDoDistrito.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <h3>Médico e clínica {instalado ? "(obrigatório para aparelho instalado)" : "(se houver)"}</h3>
+      <div className="linha">
+        <label>
+          Nome do médico
+          <input name="medico_nome" required={instalado} defaultValue={valores.medico_nome ?? ""} />
+        </label>
+        <label>
+          CRM
+          <input name="medico_crm" required={instalado} defaultValue={valores.medico_crm ?? ""} placeholder="Ex.: 123456/SP" />
+        </label>
+      </div>
+      <label>
+        Clínica / consultório
+        <input name="clinica" defaultValue={valores.clinica ?? ""} />
+      </label>
+      <div className="linha">
+        <label>
+          CEP
+          <input name="cep" defaultValue={valores.cep ?? ""} placeholder="00000-000" inputMode="numeric" maxLength={9} onBlur={(e) => buscarCep(e.target.value)} />
+        </label>
+        <label>
+          Cidade
+          <input name="cidade" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex.: Campinas/SP" />
+        </label>
+      </div>
+      <label>
+        Endereço (rua, número, complemento)
+        <input name="endereco" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
+      </label>
+      {cepInfo && <div className="pequeno">{cepInfo}</div>}
+
+      <label>
+        Observação
+        <textarea name="observacao" defaultValue={valores.observacao ?? ""} placeholder="Ex.: aguardando ativação na teleMRPA; aparelho com defeito; etc." />
+      </label>
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <a href="/inventario" className="btn secundario">Cancelar</a>
+        <button className="btn" type="submit" disabled={pendente}>{pendente ? "Salvando..." : rotulo}</button>
+      </div>
+    </form>
+  );
+}
