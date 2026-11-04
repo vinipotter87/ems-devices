@@ -2,7 +2,7 @@ import Link from "next/link";
 import Topbar from "@/components/Topbar";
 import { usuarioOuLogin, fmtDataHora } from "@/lib/pagina";
 import { q } from "@/lib/db";
-import { DEVICES, DEVICE_NOME, STATUS, STATUS_LABEL, fmtCep } from "@/lib/devices";
+import { DEVICES, DEVICE_NOME, DEVICE_IMAGEM, STATUS, STATUS_LABEL, fmtCep } from "@/lib/devices";
 import { nomeDistrito } from "@/lib/estrutura";
 import { excluirDevice } from "@/app/actions";
 
@@ -142,6 +142,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           <div className="lista-devices">
             {linhas.map((d) => (
               <div key={d.id} className="card device-card">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="thumb" src={DEVICE_IMAGEM[d.tipo]} alt={DEVICE_NOME[d.tipo] ?? d.tipo} />
                 <div>
                   <div className="titulo">
                     {DEVICE_NOME[d.tipo] ?? d.tipo} <span className="serie">{d.numero_serie}</span>

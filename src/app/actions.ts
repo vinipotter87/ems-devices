@@ -175,7 +175,7 @@ function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
   const cepBruto = s(fd, "cep");
   const cep = cepBruto ? cepBruto.replace(/\D/g, "") : "";
 
-  if (!DEVICE_KEYS.includes(tipo)) return { erro: "Selecione o device." };
+  if (!DEVICE_KEYS.includes(tipo)) return { erro: "Clique na foto do device para selecioná-lo." };
   if (!numero_serie) return { erro: "Informe o número de série." };
   if (!STATUS_KEYS.includes(status)) return { erro: "Selecione onde o aparelho está." };
   const distrito = s(fd, "distrito");

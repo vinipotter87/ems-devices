@@ -13,6 +13,8 @@ type Acao = (prev: { erro?: string } | undefined, fd: FormData) => Promise<{ err
 export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao; valores?: Valores; rotulo: string }) {
   const [estado, submit, pendente] = useActionState(acao, undefined);
   const [status, setStatus] = useState(valores.status ?? "instalado");
+  const [tipo, setTipo] = useState(valores.tipo ?? "");
+  const dev = DEVICES.find((d) => d.key === tipo);
   const [linha, setLinha] = useState(valores.distrito ? DISTRITOS[valores.distrito]?.linha ?? "" : "");
   const [distrito, setDistrito] = useState(valores.distrito ?? "");
   const [setor, setSetor] = useState(valores.setor ?? "");
@@ -47,21 +49,35 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
       {estado?.erro && <div className="erro">{estado.erro}</div>}
       {valores.id && <input type="hidden" name="id" value={valores.id} />}
 
+      <h3>Device</h3>
+      <input type="hidden" name="tipo" value={tipo} />
+      <div className="device-opcoes">
+        {DEVICES.map((d) => (
+          <button type="button" key={d.key} className={`device-opcao ${tipo === d.key ? "ativo" : ""}`} onClick={() => setTipo(d.key)}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={d.imagem} alt={d.nome} />
+            <span className="nome">{d.nome}</span>
+            <span className="cat">{d.categoria}</span>
+          </button>
+        ))}
+      </div>
+      {dev && (
+        <div className="device-detalhe">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={dev.imagem} alt={dev.nome} />
+          <div>
+            <div className="nome">{dev.nome} <span className="cat">· {dev.categoria}</span></div>
+            <div className="pequeno">{dev.descricao}</div>
+            <div className="pequeno">Marcas relacionadas: {dev.marcas}</div>
+          </div>
+        </div>
+      )}
+
       <div className="linha">
-        <label>
-          Device
-          <select name="tipo" required defaultValue={valores.tipo ?? ""}>
-            <option value="" disabled>Selecione</option>
-            {DEVICES.map((d) => <option key={d.key} value={d.key}>{d.nome} · {d.categoria}</option>)}
-          </select>
-        </label>
         <label>
           Número de série
           <input name="numero_serie" required defaultValue={valores.numero_serie ?? ""} placeholder="Como está na etiqueta do aparelho" style={{ textTransform: "uppercase" }} />
         </label>
-      </div>
-
-      <div className="linha">
         <label>
           Onde o aparelho está
           <select name="status" required value={status} onChange={(e) => setStatus(e.target.value)}>
