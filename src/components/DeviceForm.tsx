@@ -45,7 +45,6 @@ export default function DeviceForm({ acao, valores = {}, rotulo, ehGR = false, m
     }
   }
 
-  const instalado = status === "instalado";
 
   return (
     <form action={submit} className="form">
@@ -78,8 +77,8 @@ export default function DeviceForm({ acao, valores = {}, rotulo, ehGR = false, m
 
       <div className="linha">
         <label>
-          Número de série (pode ficar em branco e ser preenchido depois)
-          <input name="numero_serie" defaultValue={valores.numero_serie ?? ""} placeholder="Como está na etiqueta do aparelho" style={{ textTransform: "uppercase" }} />
+          Número de série
+          <input name="numero_serie" required defaultValue={valores.numero_serie ?? ""} placeholder="Como está na etiqueta do aparelho" style={{ textTransform: "uppercase" }} />
         </label>
         <label>
           Onde o aparelho está
@@ -91,8 +90,8 @@ export default function DeviceForm({ acao, valores = {}, rotulo, ehGR = false, m
 
       <div className="linha">
         <label>
-          Data da negociação (opcional)
-          <input name="data_negociacao" type="date" defaultValue={valores.data_negociacao ?? ""} />
+          Data da negociação
+          <input name="data_negociacao" type="date" required defaultValue={valores.data_negociacao ?? ""} />
         </label>
         {ehGR && (
           <label>
@@ -119,42 +118,42 @@ export default function DeviceForm({ acao, valores = {}, rotulo, ehGR = false, m
           </select>
         </label>
         <label>
-          Setor (opcional)
-          <select name="setor" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={!distrito}>
+          Setor {status === "com_rep" ? "" : "(opcional)"}
+          <select name="setor" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={!distrito} required={status === "com_rep"}>
             <option value="">{distrito ? "Sem setor / com o GD" : "Escolha o distrito"}</option>
             {setoresDoDistrito.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
       </div>
 
-      <h3>Localização e clínica {instalado ? "(médico obrigatório para aparelho instalado)" : "(médico e clínica, se houver)"}</h3>
+      <h3>Médico, clínica e localização (todos obrigatórios)</h3>
       <div className="linha">
         <label>
           Nome do médico
-          <input name="medico_nome" required={instalado} defaultValue={valores.medico_nome ?? ""} />
+          <input name="medico_nome" required defaultValue={valores.medico_nome ?? ""} />
         </label>
         <label>
           CRM
-          <input name="medico_crm" required={instalado} defaultValue={valores.medico_crm ?? ""} placeholder="Ex.: 123456/SP" />
+          <input name="medico_crm" required defaultValue={valores.medico_crm ?? ""} placeholder="Ex.: 123456/SP" />
         </label>
       </div>
       <label>
         Clínica / consultório
-        <input name="clinica" defaultValue={valores.clinica ?? ""} />
+        <input name="clinica" required defaultValue={valores.clinica ?? ""} />
       </label>
       <div className="linha">
         <label>
           CEP
-          <input name="cep" defaultValue={valores.cep ?? ""} placeholder="00000-000" inputMode="numeric" maxLength={9} onBlur={(e) => buscarCep(e.target.value)} />
+          <input name="cep" required defaultValue={valores.cep ?? ""} placeholder="00000-000" inputMode="numeric" maxLength={9} onBlur={(e) => buscarCep(e.target.value)} />
         </label>
         <label>
-          Cidade (obrigatória: posiciona o aparelho no mapa)
+          Cidade
           <CidadeInput ibgeInicial={valores.cidade_ibge} valorExterno={cidadeCep} />
         </label>
       </div>
       <label>
         Endereço (rua, número, complemento)
-        <input name="endereco" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
+        <input name="endereco" required value={endereco} onChange={(e) => setEndereco(e.target.value)} />
       </label>
       {cepInfo && <div className="pequeno">{cepInfo}</div>}
 

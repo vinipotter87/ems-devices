@@ -30,6 +30,7 @@ export default function CidadeInput({ ibgeInicial, valorExterno }: { ibgeInicial
         onChange={(e) => { setTexto(e.target.value); setIbge(""); setAberto(true); }}
         onFocus={() => setAberto(true)}
         placeholder="Digite o nome da cidade"
+        required
         autoComplete="off"
         className={ibge ? "ok" : ""}
       />

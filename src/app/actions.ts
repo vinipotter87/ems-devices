@@ -198,17 +198,28 @@ function lerCampos(fd: FormData, eu: Usuario): { campos?: Campos; erro?: string 
 
   const medico_nome = s(fd, "medico_nome") || null;
   const medico_crm = s(fd, "medico_crm") || null;
-  if (status === "instalado" && (!medico_nome || !medico_crm)) {
-    return { erro: "Para aparelho instalado na clínica, informe nome e CRM do médico." };
-  }
+  const clinica = s(fd, "clinica") || null;
+  const endereco = s(fd, "endereco") || null;
+
+  // Cadastro completo obrigatorio: nenhum campo essencial fica em branco.
+  const faltam: string[] = [];
+  if (!numero_serie) faltam.push("número de série");
+  if (!data_negociacao) faltam.push("data da negociação");
+  if (!medico_nome) faltam.push("nome do médico");
+  if (!medico_crm) faltam.push("CRM");
+  if (!clinica) faltam.push("clínica");
+  if (!cep) faltam.push("CEP");
+  if (!endereco) faltam.push("endereço");
+  if (status === "com_rep" && !setor) faltam.push("setor do representante");
+  if (faltam.length) return { erro: `Preencha todos os campos para concluir. Faltando: ${faltam.join(", ")}.` };
 
   return {
     campos: {
       tipo, numero_serie, status, distrito, responsavel_email, data_negociacao,
       setor: setor || null,
       medico_nome, medico_crm,
-      clinica: s(fd, "clinica") || null,
-      endereco: s(fd, "endereco") || null,
+      clinica,
+      endereco,
       cidade: cidadeRef.rotulo,
       cidade_ibge,
       cep: cep ? `${cep.slice(0, 5)}-${cep.slice(5)}` : null,
