@@ -2,11 +2,13 @@
 import { useActionState, useState } from "react";
 import { DEVICES, STATUS } from "@/lib/devices";
 import { LINHAS, DISTRITOS, DISTRITO_CODIGOS } from "@/lib/estrutura";
+import { acharCidade, type Cidade } from "@/lib/cidades";
+import CidadeInput from "@/components/CidadeInput";
 
 type Valores = {
   id?: number; tipo?: string; numero_serie?: string; status?: string; distrito?: string; setor?: string | null;
   medico_nome?: string | null; medico_crm?: string | null; clinica?: string | null;
-  endereco?: string | null; cidade?: string | null; cep?: string | null; observacao?: string | null;
+  endereco?: string | null; cidade?: string | null; cidade_ibge?: string | null; cep?: string | null; observacao?: string | null;
 };
 type Acao = (prev: { erro?: string } | undefined, fd: FormData) => Promise<{ erro?: string } | undefined>;
 
@@ -21,7 +23,7 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
   const distritosDaLinha = DISTRITO_CODIGOS.filter((d) => DISTRITOS[d].linha === linha);
   const setoresDoDistrito = distrito ? DISTRITOS[distrito]?.setores ?? [] : [];
   const [endereco, setEndereco] = useState(valores.endereco ?? "");
-  const [cidade, setCidade] = useState(valores.cidade ?? "");
+  const [cidadeCep, setCidadeCep] = useState<Cidade | null>(null);
   const [cepInfo, setCepInfo] = useState("");
 
   // Preenche endereco e cidade a partir do CEP (ViaCEP). Se falhar, o usuario digita manualmente.
@@ -35,8 +37,9 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
       if (j.erro) { setCepInfo("CEP não encontrado. Preencha o endereço manualmente."); return; }
       const rua = [j.logradouro, j.bairro].filter(Boolean).join(", ");
       if (rua && !endereco) setEndereco(rua);
-      if (j.localidade) setCidade(j.uf ? `${j.localidade}/${j.uf}` : j.localidade);
-      setCepInfo("Endereço preenchido pelo CEP. Confira e complete o número.");
+      const cid = j.localidade && j.uf ? acharCidade(j.localidade, j.uf) : undefined;
+      if (cid) setCidadeCep(cid);
+      setCepInfo(cid ? "Endereço e cidade preenchidos pelo CEP. Confira e complete o número." : "Endereço preenchido pelo CEP. A cidade deste CEP não está na base da SPI: escolha a mais próxima na lista.");
     } catch {
       setCepInfo("Não foi possível consultar o CEP. Preencha manualmente.");
     }
@@ -111,7 +114,7 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
         </label>
       </div>
 
-      <h3>Médico e clínica {instalado ? "(obrigatório para aparelho instalado)" : "(se houver)"}</h3>
+      <h3>Localização e clínica {instalado ? "(médico obrigatório para aparelho instalado)" : "(médico e clínica, se houver)"}</h3>
       <div className="linha">
         <label>
           Nome do médico
@@ -132,8 +135,8 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
           <input name="cep" defaultValue={valores.cep ?? ""} placeholder="00000-000" inputMode="numeric" maxLength={9} onBlur={(e) => buscarCep(e.target.value)} />
         </label>
         <label>
-          Cidade
-          <input name="cidade" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex.: Campinas/SP" />
+          Cidade (obrigatória: posiciona o aparelho no mapa)
+          <CidadeInput ibgeInicial={valores.cidade_ibge} valorExterno={cidadeCep} />
         </label>
       </div>
       <label>

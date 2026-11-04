@@ -14,6 +14,7 @@ export default function Topbar({ usuario }: { usuario: Usuario }) {
       <nav>
         <Link href="/inventario">Inventário</Link>
         <Link href="/inventario/novo">Novo registro</Link>
+        <Link href="/mapa">Mapa</Link>
         {usuario.papel === "GR" && <Link href="/usuarios">Usuários</Link>}
         <span className="quem">{usuario.email}</span>
         <form action={logout}>

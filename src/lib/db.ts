@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS devices (
   clinica TEXT,
   endereco TEXT,
   cidade TEXT,
+  cidade_ibge TEXT,
   cep TEXT,
   observacao TEXT,
   registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
@@ -69,7 +70,9 @@ CREATE TABLE IF NOT EXISTS devices (
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (tipo, numero_serie)
 );
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS cidade_ibge TEXT;
 CREATE INDEX IF NOT EXISTS devices_distrito_idx ON devices(distrito);
+CREATE INDEX IF NOT EXISTS devices_cidade_idx ON devices(cidade_ibge);
 CREATE INDEX IF NOT EXISTS devices_registrado_idx ON devices(registrado_por);
 CREATE INDEX IF NOT EXISTS devices_tipo_idx ON devices(tipo, status);
 

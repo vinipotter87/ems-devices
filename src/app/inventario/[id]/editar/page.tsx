@@ -13,7 +13,7 @@ export default async function EditarDevicePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const d = await one<{
     id: number; tipo: string; numero_serie: string; status: string; distrito: string; setor: string | null; medico_nome: string | null;
-    medico_crm: string | null; clinica: string | null; endereco: string | null; cidade: string | null; cep: string | null;
+    medico_crm: string | null; clinica: string | null; endereco: string | null; cidade: string | null; cidade_ibge: string | null; cep: string | null;
     observacao: string | null; registrado_por: number; registrado_email: string;
   }>("SELECT * FROM devices WHERE id = $1", [Number(id)]);
   if (!d) notFound();

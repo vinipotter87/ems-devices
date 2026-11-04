@@ -21,6 +21,7 @@ import {
 import { enviarCodigo } from "@/lib/email";
 import { DEVICE_KEYS, STATUS_KEYS, cepValido } from "@/lib/devices";
 import { DISTRITOS, setorPertence } from "@/lib/estrutura";
+import { CIDADE_POR_IBGE } from "@/lib/cidades";
 
 type Resultado = { erro?: string } | undefined;
 
@@ -165,7 +166,7 @@ export async function renomearUsuario(fd: FormData): Promise<void> {
 type Campos = {
   tipo: string; numero_serie: string; status: string; distrito: string; setor: string | null;
   medico_nome: string | null; medico_crm: string | null; clinica: string | null;
-  endereco: string | null; cidade: string | null; cep: string | null; observacao: string | null;
+  endereco: string | null; cidade: string | null; cidade_ibge: string; cep: string | null; observacao: string | null;
 };
 
 function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
@@ -182,6 +183,9 @@ function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
   const setor = s(fd, "setor");
   if (!DISTRITOS[distrito]) return { erro: "Selecione o distrito." };
   if (setor && !setorPertence(setor, distrito)) return { erro: "O setor informado não pertence ao distrito selecionado." };
+  const cidade_ibge = s(fd, "cidade_ibge");
+  const cidadeRef = CIDADE_POR_IBGE[cidade_ibge];
+  if (!cidadeRef) return { erro: "Escolha a cidade na lista (é ela que posiciona o aparelho no mapa)." };
   if (cep && !cepValido(cep)) return { erro: "CEP inválido. Use o formato 00000-000." };
 
   const medico_nome = s(fd, "medico_nome") || null;
@@ -197,7 +201,8 @@ function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
       medico_nome, medico_crm,
       clinica: s(fd, "clinica") || null,
       endereco: s(fd, "endereco") || null,
-      cidade: s(fd, "cidade") || null,
+      cidade: cidadeRef.rotulo,
+      cidade_ibge,
       cep: cep ? `${cep.slice(0, 5)}-${cep.slice(5)}` : null,
       observacao: s(fd, "observacao") || null,
     },
@@ -227,10 +232,10 @@ export async function criarDevice(_prev: Resultado, fd: FormData): Promise<Resul
 
   // O registro pertence ao email corporativo que esta logado.
   const d = await one<{ id: number }>(
-    `INSERT INTO devices (tipo, numero_serie, status, distrito, setor, medico_nome, medico_crm, clinica, endereco, cidade, cep, observacao,
+    `INSERT INTO devices (tipo, numero_serie, status, distrito, setor, medico_nome, medico_crm, clinica, endereco, cidade, cidade_ibge, cep, observacao,
                           registrado_por, registrado_email, atualizado_por, atualizado_email)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$13,$14) RETURNING id`,
-    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cep, c.observacao, eu.id, eu.email]
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$14,$15) RETURNING id`,
+    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cidade_ibge, c.cep, c.observacao, eu.id, eu.email]
   );
   await registrarHistorico(d!.id, "criou", eu.email);
   revalidatePath("/inventario");
@@ -249,9 +254,9 @@ export async function atualizarDevice(_prev: Resultado, fd: FormData): Promise<R
 
   await q(
     `UPDATE devices SET tipo=$1, numero_serie=$2, status=$3, distrito=$4, setor=$5, medico_nome=$6, medico_crm=$7, clinica=$8,
-            endereco=$9, cidade=$10, cep=$11, observacao=$12, atualizado_por=$13, atualizado_email=$14, atualizado_em=NOW()
-     WHERE id=$15`,
-    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cep, c.observacao, eu.id, eu.email, id]
+            endereco=$9, cidade=$10, cidade_ibge=$11, cep=$12, observacao=$13, atualizado_por=$14, atualizado_email=$15, atualizado_em=NOW()
+     WHERE id=$16`,
+    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cidade_ibge, c.cep, c.observacao, eu.id, eu.email, id]
   );
   await registrarHistorico(id, "alterou", eu.email);
   revalidatePath("/inventario");

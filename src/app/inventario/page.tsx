@@ -4,6 +4,7 @@ import { usuarioOuLogin, fmtDataHora } from "@/lib/pagina";
 import { q } from "@/lib/db";
 import { DEVICES, DEVICE_NOME, DEVICE_IMAGEM, STATUS, STATUS_LABEL, fmtCep } from "@/lib/devices";
 import { nomeDistrito } from "@/lib/estrutura";
+import { CIDADE_POR_IBGE } from "@/lib/cidades";
 import { excluirDevice } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ type Linha = {
 
 const OK: Record<string, string> = { criado: "Registro criado.", alterado: "Registro atualizado.", excluido: "Registro excluído." };
 
-export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ tipo?: string; status?: string; quem?: string; distrito?: string; ok?: string }> }) {
+export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ tipo?: string; status?: string; quem?: string; distrito?: string; cidade?: string; ok?: string }> }) {
   const eu = await usuarioOuLogin();
   const sp = await searchParams;
   const ehGR = eu.papel === "GR";
@@ -30,6 +31,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   if (sp.status) { params.push(sp.status); cond.push(`d.status = $${params.length}`); }
   if (ehGR && sp.quem) { params.push(Number(sp.quem)); cond.push(`d.registrado_por = $${params.length}`); }
   if (sp.distrito) { params.push(sp.distrito); cond.push(`d.distrito = $${params.length}`); }
+  if (sp.cidade) { params.push(sp.cidade); cond.push(`d.cidade_ibge = $${params.length}`); }
   const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
 
   const linhas = await q<Linha>(`
@@ -58,7 +60,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
 
   const link = (p: Record<string, string | undefined>) => {
     const u = new URLSearchParams();
-    const m = { tipo: sp.tipo, status: sp.status, quem: sp.quem, distrito: sp.distrito, ...p };
+    const m = { tipo: sp.tipo, status: sp.status, quem: sp.quem, distrito: sp.distrito, cidade: sp.cidade, ...p };
     for (const [k, v] of Object.entries(m)) if (v) u.set(k, v);
     const qs = u.toString();
     return `/inventario${qs ? "?" + qs : ""}`;
@@ -82,6 +84,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
         </div>
 
         {sp.ok && OK[sp.ok] && <div className="ok" style={{ marginTop: 12 }}>{OK[sp.ok]}</div>}
+        {sp.cidade && <div className="filtros" style={{ marginBottom: 0 }}><Link href={link({ cidade: undefined })} className="ativo">Cidade: {CIDADE_POR_IBGE[sp.cidade]?.rotulo ?? sp.cidade} ✕</Link></div>}
 
         {ehGR && (
           <div className="card" style={{ marginTop: 14 }}>
@@ -128,7 +131,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
         )}
 
         <div className="filtros">
-          <Link href={link({ tipo: undefined, status: undefined, quem: undefined, distrito: undefined })} className={!sp.tipo && !sp.status && !sp.quem && !sp.distrito ? "ativo" : ""}>Todos</Link>
+          <Link href={link({ tipo: undefined, status: undefined, quem: undefined, distrito: undefined, cidade: undefined })} className={!sp.tipo && !sp.status && !sp.quem && !sp.distrito && !sp.cidade ? "ativo" : ""}>Todos</Link>
           {DEVICES.map((d) => <Link key={d.key} href={link({ tipo: sp.tipo === d.key ? undefined : d.key })} className={sp.tipo === d.key ? "ativo" : ""}>{d.nome}</Link>)}
           <span style={{ width: 8 }} />
           {STATUS.map((s) => <Link key={s.key} href={link({ status: sp.status === s.key ? undefined : s.key })} className={sp.status === s.key ? "ativo" : ""}>{s.label}</Link>)}
