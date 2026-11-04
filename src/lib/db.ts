@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS devices (
   registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
   registrado_email TEXT NOT NULL,
   responsavel_email TEXT,
+  responsavel_nome TEXT,
+  card_impulse TEXT,
   data_negociacao DATE,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   atualizado_por INTEGER REFERENCES usuarios(id),
@@ -75,6 +77,8 @@ CREATE TABLE IF NOT EXISTS devices (
 ALTER TABLE devices ALTER COLUMN numero_serie DROP NOT NULL;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS responsavel_email TEXT;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS data_negociacao DATE;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS responsavel_nome TEXT;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS card_impulse TEXT;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS cidade_ibge TEXT;
 CREATE INDEX IF NOT EXISTS devices_distrito_idx ON devices(distrito);
 CREATE INDEX IF NOT EXISTS devices_cidade_idx ON devices(cidade_ibge);

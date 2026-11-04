@@ -6,6 +6,8 @@ export const DEVICES = [
   { key: "nightview", nome: "NightView", categoria: "Pressão arterial noturna", marcas: "Brasart", imagem: "/devices/nightview.png", descricao: "Monitor de pulso com medições programadas durante o sono. Sem emissão de laudo." },
   { key: "holter", nome: "Holter", categoria: "Monitorização cardíaca", marcas: "Xakilis · Vynaxa", imagem: "/devices/holter.png", descricao: "Registro contínuo do ritmo cardíaco. Laudo solicitado pelo portal SRA da Geratherm." },
   { key: "arteris", nome: "AOP Arteris", categoria: "Avaliação vascular", marcas: "Xakilis · Vynaxa", imagem: "/devices/arteris.png", descricao: "Pressão central, velocidade da onda de pulso e rigidez arterial. Sem emissão de laudo." },
+  { key: "bioimpedancia", nome: "Bioimpedância", categoria: "Composição corporal", marcas: "Metabólico", imagem: "/devices/bioimpedancia.svg", descricao: "Balança de bioimpedância para avaliação de composição corporal (device do IMPULSE)." },
+  { key: "lanceta", nome: "Lanceta H. pylori", categoria: "Teste rápido", marcas: "Gastro", imagem: "/devices/lanceta.svg", descricao: "Lanceta para teste sorológico de H. pylori (device do IMPULSE)." },
 ] as const;
 
 export type DeviceKey = (typeof DEVICES)[number]["key"];

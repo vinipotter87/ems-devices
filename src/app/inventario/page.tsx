@@ -11,7 +11,7 @@ import { excluirDevice } from "@/app/actions";
 export const dynamic = "force-dynamic";
 
 type Linha = {
-  id: number; tipo: string; numero_serie: string | null; status: string; distrito: string; setor: string | null; responsavel_email: string | null; data_negociacao: string | null;
+  id: number; tipo: string; numero_serie: string | null; status: string; distrito: string; setor: string | null; responsavel_email: string | null; responsavel_nome: string | null; card_impulse: string | null; data_negociacao: string | null;
   medico_nome: string | null; medico_crm: string | null; clinica: string | null;
   endereco: string | null; cidade: string | null; cep: string | null; observacao: string | null;
   registrado_email: string; registrado_nome: string; atualizado_em: string; atualizado_email: string | null;
@@ -30,7 +30,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   if (!ehGR) { params.push(eu.id); params.push(eu.email); cond.push(`(d.registrado_por = $${params.length - 1} OR d.responsavel_email = $${params.length})`); }
   if (sp.tipo) { params.push(sp.tipo); cond.push(`d.tipo = $${params.length}`); }
   if (sp.status) { params.push(sp.status); cond.push(`d.status = $${params.length}`); }
-  if (ehGR && sp.quem) { params.push(sp.quem); cond.push(`COALESCE(d.responsavel_email, d.registrado_email) = $${params.length}`); }
+  if (ehGR && sp.quem) { params.push(sp.quem); cond.push(`COALESCE(d.responsavel_email, d.responsavel_nome, d.registrado_email) = $${params.length}`); }
   if (sp.distrito) { params.push(sp.distrito); cond.push(`d.distrito = $${params.length}`); }
   if (sp.cidade) { params.push(sp.cidade); cond.push(`d.cidade_ibge = $${params.length}`); }
   const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
@@ -51,7 +51,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     : [];
   const porPessoa = ehGR
     ? await q<{ email: string; n: string }>(
-        `SELECT COALESCE(d.responsavel_email, d.registrado_email) AS email, COUNT(*)::text AS n FROM devices d
+        `SELECT COALESCE(d.responsavel_email, d.responsavel_nome, d.registrado_email) AS email, COUNT(*)::text AS n FROM devices d
          GROUP BY 1 ORDER BY 1`)
     : [];
   const cont = (tipo: string, status?: string) =>
@@ -79,6 +79,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {ehGR && <a href="/inventario/exportar" className="btn secundario">Exportar Excel (CSV)</a>}
+            {ehGR && <Link href="/importar" className="btn secundario">Importar lote</Link>}
             <Link href="/inventario/novo" className="btn">Novo registro</Link>
           </div>
         </div>
@@ -121,7 +122,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                 <div className="filtros" style={{ margin: 0 }}>
                   {porPessoa.map((p) => (
                     <Link key={p.email} href={link({ quem: sp.quem === p.email ? undefined : p.email })} className={sp.quem === p.email ? "ativo" : ""} title={p.email}>
-                      {nomeDoEmail(p.email)}: {p.n}
+                      {p.email.includes("@") ? nomeDoEmail(p.email) : p.email}: {p.n}
                     </Link>
                   ))}
                 </div>
@@ -166,7 +167,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                   {d.observacao && <div className="meta"><span>{d.observacao}</span></div>}
                   <div className="meta rodape">
                     <span><b>{nomeDistrito(d.distrito)}</b>{d.setor ? ` · Setor ${d.setor}` : ""}</span>
-                    <span>GD: {d.responsavel_email ? `${nomeDoEmail(d.responsavel_email)} (${d.responsavel_email})` : `${d.registrado_nome} (${d.registrado_email})`}{d.responsavel_email ? ` · registrado por ${d.registrado_email}` : ""}</span>
+                    <span>GD: {d.responsavel_email ? `${nomeDoEmail(d.responsavel_email)} (${d.responsavel_email})` : d.responsavel_nome ? `${d.responsavel_nome} (email a vincular)` : `${d.registrado_nome} (${d.registrado_email})`}{d.responsavel_email || d.responsavel_nome ? ` · registrado por ${d.registrado_email}` : ""}</span>
+                    {d.card_impulse && <span>Card IMPULSE {d.card_impulse}</span>}
                     {d.data_negociacao && <span>Negociado em {fmtData(d.data_negociacao)}</span>}
                     <span>Atualizado em {fmtDataHora(d.atualizado_em)}{d.atualizado_email && d.atualizado_email !== d.registrado_email ? ` por ${d.atualizado_email}` : ""}</span>
                   </div>

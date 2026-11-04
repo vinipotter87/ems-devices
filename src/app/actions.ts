@@ -281,3 +281,53 @@ export async function excluirDevice(fd: FormData): Promise<void> {
   revalidatePath("/inventario");
   redirect("/inventario?ok=excluido");
 }
+
+
+// ---------------- IMPORTACAO EM LOTE (somente GR) ----------------
+export type ItemLote = {
+  tipo: string; status: string; distrito: string; setor?: string | null; numero_serie?: string | null;
+  medico_nome?: string | null; medico_crm?: string | null; clinica?: string | null; cidade_ibge?: string | null;
+  responsavel_email?: string | null; responsavel_nome?: string | null; data_negociacao?: string | null;
+  observacao?: string | null; card_impulse?: string | null;
+};
+export type ResultadoLote = { erro?: string; criados?: number; pulados?: string[] };
+
+export async function importarLote(_prev: ResultadoLote | undefined, fd: FormData): Promise<ResultadoLote> {
+  const eu = await exigirUsuario();
+  if (eu.papel !== "GR") return { erro: "Somente o Gerente Regional importa em lote." };
+  let itens: ItemLote[];
+  try { itens = JSON.parse(s(fd, "json")); if (!Array.isArray(itens)) throw new Error(); } catch { return { erro: "JSON inválido: esperado uma lista de registros." }; }
+  let criados = 0; const pulados: string[] = [];
+  for (const [i, it] of itens.entries()) {
+    const rot = `#${i + 1}${it.card_impulse ? ` (card ${it.card_impulse})` : ""}`;
+    if (!DEVICE_KEYS.includes(it.tipo)) { pulados.push(`${rot}: device desconhecido "${it.tipo}"`); continue; }
+    if (!STATUS_KEYS.includes(it.status)) { pulados.push(`${rot}: status desconhecido "${it.status}"`); continue; }
+    if (!DISTRITOS[it.distrito]) { pulados.push(`${rot}: distrito desconhecido "${it.distrito}"`); continue; }
+    if (it.setor && !setorPertence(it.setor, it.distrito)) { pulados.push(`${rot}: setor fora do distrito`); continue; }
+    const cid = it.cidade_ibge ? CIDADE_POR_IBGE[it.cidade_ibge] : undefined;
+    if (it.cidade_ibge && !cid) { pulados.push(`${rot}: cidade desconhecida "${it.cidade_ibge}"`); continue; }
+    const resp = (it.responsavel_email ?? "").toLowerCase().trim() || null;
+    if (resp && !emailDoDominio(resp)) { pulados.push(`${rot}: email do GD fora do domínio`); continue; }
+    const serie = (it.numero_serie ?? "").toUpperCase().trim() || null;
+    if (serie) {
+      const dup = await one("SELECT 1 AS x FROM devices WHERE tipo = $1 AND numero_serie = $2", [it.tipo, serie]);
+      if (dup) { pulados.push(`${rot}: série ${serie} já existe`); continue; }
+    }
+    if (it.card_impulse) {
+      const dupCard = await one("SELECT 1 AS x FROM devices WHERE card_impulse = $1", [it.card_impulse]);
+      if (dupCard) { pulados.push(`${rot}: card já importado`); continue; }
+    }
+    const d = await one<{ id: number }>(
+      `INSERT INTO devices (tipo, numero_serie, status, distrito, setor, medico_nome, medico_crm, clinica, endereco, cidade, cidade_ibge, cep, observacao,
+                            registrado_por, registrado_email, atualizado_por, atualizado_email, responsavel_email, responsavel_nome, data_negociacao, card_impulse)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,$9,$10,NULL,$11,$12,$13,$12,$13,$14,$15,$16,$17) RETURNING id`,
+      [it.tipo, serie, it.status, it.distrito, it.setor || null, it.medico_nome || null, it.medico_crm || null, it.clinica || null,
+       cid?.rotulo ?? null, cid?.ibge ?? null, it.observacao || null, eu.id, eu.email, resp, it.responsavel_nome || null,
+       it.data_negociacao || null, it.card_impulse || null]
+    );
+    await registrarHistorico(d!.id, "criou", eu.email);
+    criados++;
+  }
+  revalidatePath("/inventario"); revalidatePath("/mapa");
+  return { criados, pulados };
+}
