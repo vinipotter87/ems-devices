@@ -14,7 +14,7 @@ export default async function NovoDevicePage() {
         <h1>Novo registro</h1>
         <p className="suave">Um registro por aparelho físico. Este registro ficará em nome de <b>{eu.email}</b>.</p>
         <div className="card">
-          <DeviceForm acao={criarDevice} rotulo="Registrar aparelho" />
+          <DeviceForm acao={criarDevice} rotulo="Registrar aparelho" ehGR={eu.papel === "GR"} meuEmail={eu.email} />
         </div>
       </main>
     </>

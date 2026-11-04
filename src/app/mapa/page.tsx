@@ -10,7 +10,7 @@ export default async function MapaPage() {
   const ehGR = eu.papel === "GR";
   // GD e Staff veem o mapa dos proprios registros; o GR ve a regional.
   const params: unknown[] = [];
-  const where = ehGR ? "WHERE cidade_ibge IS NOT NULL" : (params.push(eu.id), "WHERE cidade_ibge IS NOT NULL AND registrado_por = $1");
+  const where = ehGR ? "WHERE cidade_ibge IS NOT NULL" : (params.push(eu.id, eu.email), "WHERE cidade_ibge IS NOT NULL AND (registrado_por = $1 OR responsavel_email = $2)");
   const rows = await q<{ cidade_ibge: string; tipo: string; n: string }>(
     `SELECT cidade_ibge, tipo, COUNT(*)::text AS n FROM devices ${where} GROUP BY cidade_ibge, tipo`, params);
   const contagem: Record<string, Record<string, number>> = {};

@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS login_codigos_email_idx ON login_codigos(email, id);
 CREATE TABLE IF NOT EXISTS devices (
   id SERIAL PRIMARY KEY,
   tipo TEXT NOT NULL,
-  numero_serie TEXT NOT NULL,
+  numero_serie TEXT,
   status TEXT NOT NULL,
   distrito TEXT NOT NULL,
   setor TEXT,
@@ -64,15 +64,21 @@ CREATE TABLE IF NOT EXISTS devices (
   observacao TEXT,
   registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
   registrado_email TEXT NOT NULL,
+  responsavel_email TEXT,
+  data_negociacao DATE,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   atualizado_por INTEGER REFERENCES usuarios(id),
   atualizado_email TEXT,
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (tipo, numero_serie)
 );
+ALTER TABLE devices ALTER COLUMN numero_serie DROP NOT NULL;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS responsavel_email TEXT;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS data_negociacao DATE;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS cidade_ibge TEXT;
 CREATE INDEX IF NOT EXISTS devices_distrito_idx ON devices(distrito);
 CREATE INDEX IF NOT EXISTS devices_cidade_idx ON devices(cidade_ibge);
+CREATE INDEX IF NOT EXISTS devices_responsavel_idx ON devices(responsavel_email);
 CREATE INDEX IF NOT EXISTS devices_registrado_idx ON devices(registrado_por);
 CREATE INDEX IF NOT EXISTS devices_tipo_idx ON devices(tipo, status);
 

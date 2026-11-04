@@ -164,20 +164,28 @@ export async function renomearUsuario(fd: FormData): Promise<void> {
 
 // ---------------- INVENTARIO DE DEVICES ----------------
 type Campos = {
-  tipo: string; numero_serie: string; status: string; distrito: string; setor: string | null;
+  tipo: string; numero_serie: string | null; status: string; distrito: string; setor: string | null; responsavel_email: string | null; data_negociacao: string | null;
   medico_nome: string | null; medico_crm: string | null; clinica: string | null;
   endereco: string | null; cidade: string | null; cidade_ibge: string; cep: string | null; observacao: string | null;
 };
 
-function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
+function lerCampos(fd: FormData, eu: Usuario): { campos?: Campos; erro?: string } {
   const tipo = s(fd, "tipo");
-  const numero_serie = s(fd, "numero_serie").toUpperCase();
+  const numero_serie = s(fd, "numero_serie").toUpperCase() || null;
+  // Somente o GR registra em nome de outro GD; para os demais, o responsavel e sempre quem logou.
+  const respBruto = s(fd, "responsavel_email").toLowerCase();
+  let responsavel_email: string | null = null;
+  if (eu.papel === "GR" && respBruto) {
+    if (!emailValido(respBruto) || !emailDoDominio(respBruto)) return { erro: `O email do GD responsável precisa ser @${DOMINIO_PERMITIDO}.` };
+    responsavel_email = respBruto;
+  }
+  const data_negociacao = s(fd, "data_negociacao") || null;
+  if (data_negociacao && !/^\d{4}-\d{2}-\d{2}$/.test(data_negociacao)) return { erro: "Data de negociação inválida." };
   const status = s(fd, "status");
   const cepBruto = s(fd, "cep");
   const cep = cepBruto ? cepBruto.replace(/\D/g, "") : "";
 
   if (!DEVICE_KEYS.includes(tipo)) return { erro: "Clique na foto do device para selecioná-lo." };
-  if (!numero_serie) return { erro: "Informe o número de série." };
   if (!STATUS_KEYS.includes(status)) return { erro: "Selecione onde o aparelho está." };
   const distrito = s(fd, "distrito");
   const setor = s(fd, "setor");
@@ -196,7 +204,7 @@ function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
 
   return {
     campos: {
-      tipo, numero_serie, status, distrito,
+      tipo, numero_serie, status, distrito, responsavel_email, data_negociacao,
       setor: setor || null,
       medico_nome, medico_crm,
       clinica: s(fd, "clinica") || null,
@@ -211,7 +219,7 @@ function lerCampos(fd: FormData): { campos?: Campos; erro?: string } {
 
 async function podeEditar(eu: Usuario, id: number): Promise<boolean> {
   if (eu.papel === "GR") return true;
-  const d = await one<{ x: number }>("SELECT 1 AS x FROM devices WHERE id = $1 AND registrado_por = $2", [id, eu.id]);
+  const d = await one<{ x: number }>("SELECT 1 AS x FROM devices WHERE id = $1 AND (registrado_por = $2 OR responsavel_email = $3)", [id, eu.id, eu.email]);
   return !!d;
 }
 
@@ -224,18 +232,18 @@ async function registrarHistorico(deviceId: number, acao: "criou" | "alterou" | 
 
 export async function criarDevice(_prev: Resultado, fd: FormData): Promise<Resultado> {
   const eu = await exigirUsuario();
-  const { campos: c, erro } = lerCampos(fd);
+  const { campos: c, erro } = lerCampos(fd, eu);
   if (erro || !c) return { erro };
 
-  const dup = await one("SELECT 1 AS x FROM devices WHERE tipo = $1 AND numero_serie = $2", [c.tipo, c.numero_serie]);
+  const dup = c.numero_serie ? await one("SELECT 1 AS x FROM devices WHERE tipo = $1 AND numero_serie = $2", [c.tipo, c.numero_serie]) : null;
   if (dup) return { erro: "Já existe um registro deste device com esse número de série." };
 
   // O registro pertence ao email corporativo que esta logado.
   const d = await one<{ id: number }>(
     `INSERT INTO devices (tipo, numero_serie, status, distrito, setor, medico_nome, medico_crm, clinica, endereco, cidade, cidade_ibge, cep, observacao,
-                          registrado_por, registrado_email, atualizado_por, atualizado_email)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$14,$15) RETURNING id`,
-    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cidade_ibge, c.cep, c.observacao, eu.id, eu.email]
+                          registrado_por, registrado_email, atualizado_por, atualizado_email, responsavel_email, data_negociacao)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$14,$15,$16,$17) RETURNING id`,
+    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cidade_ibge, c.cep, c.observacao, eu.id, eu.email, c.responsavel_email, c.data_negociacao]
   );
   await registrarHistorico(d!.id, "criou", eu.email);
   revalidatePath("/inventario");
@@ -246,17 +254,18 @@ export async function atualizarDevice(_prev: Resultado, fd: FormData): Promise<R
   const eu = await exigirUsuario();
   const id = Number(fd.get("id"));
   if (!id || !(await podeEditar(eu, id))) return { erro: "Você não pode alterar este registro." };
-  const { campos: c, erro } = lerCampos(fd);
+  const { campos: c, erro } = lerCampos(fd, eu);
   if (erro || !c) return { erro };
 
-  const dup = await one("SELECT 1 AS x FROM devices WHERE tipo = $1 AND numero_serie = $2 AND id <> $3", [c.tipo, c.numero_serie, id]);
+  const dup = c.numero_serie ? await one("SELECT 1 AS x FROM devices WHERE tipo = $1 AND numero_serie = $2 AND id <> $3", [c.tipo, c.numero_serie, id]) : null;
   if (dup) return { erro: "Já existe outro registro deste device com esse número de série." };
 
   await q(
     `UPDATE devices SET tipo=$1, numero_serie=$2, status=$3, distrito=$4, setor=$5, medico_nome=$6, medico_crm=$7, clinica=$8,
-            endereco=$9, cidade=$10, cidade_ibge=$11, cep=$12, observacao=$13, atualizado_por=$14, atualizado_email=$15, atualizado_em=NOW()
-     WHERE id=$16`,
-    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cidade_ibge, c.cep, c.observacao, eu.id, eu.email, id]
+            endereco=$9, cidade=$10, cidade_ibge=$11, cep=$12, observacao=$13, atualizado_por=$14, atualizado_email=$15, atualizado_em=NOW(),
+            data_negociacao=$16, responsavel_email = CASE WHEN $17::text IS NULL AND $18 <> 'GR' THEN responsavel_email ELSE $17 END
+     WHERE id=$19`,
+    [c.tipo, c.numero_serie, c.status, c.distrito, c.setor, c.medico_nome, c.medico_crm, c.clinica, c.endereco, c.cidade, c.cidade_ibge, c.cep, c.observacao, eu.id, eu.email, c.data_negociacao, c.responsavel_email, eu.papel, id]
   );
   await registrarHistorico(id, "alterou", eu.email);
   revalidatePath("/inventario");

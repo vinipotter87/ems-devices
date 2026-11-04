@@ -6,13 +6,13 @@ import { acharCidade, type Cidade } from "@/lib/cidades";
 import CidadeInput from "@/components/CidadeInput";
 
 type Valores = {
-  id?: number; tipo?: string; numero_serie?: string; status?: string; distrito?: string; setor?: string | null;
+  id?: number; tipo?: string; numero_serie?: string | null; status?: string; distrito?: string; setor?: string | null; responsavel_email?: string | null; data_negociacao?: string | null;
   medico_nome?: string | null; medico_crm?: string | null; clinica?: string | null;
   endereco?: string | null; cidade?: string | null; cidade_ibge?: string | null; cep?: string | null; observacao?: string | null;
 };
 type Acao = (prev: { erro?: string } | undefined, fd: FormData) => Promise<{ erro?: string } | undefined>;
 
-export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao; valores?: Valores; rotulo: string }) {
+export default function DeviceForm({ acao, valores = {}, rotulo, ehGR = false, meuEmail = "" }: { acao: Acao; valores?: Valores; rotulo: string; ehGR?: boolean; meuEmail?: string }) {
   const [estado, submit, pendente] = useActionState(acao, undefined);
   const [status, setStatus] = useState(valores.status ?? "instalado");
   const [tipo, setTipo] = useState(valores.tipo ?? "");
@@ -78,8 +78,8 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
 
       <div className="linha">
         <label>
-          Número de série
-          <input name="numero_serie" required defaultValue={valores.numero_serie ?? ""} placeholder="Como está na etiqueta do aparelho" style={{ textTransform: "uppercase" }} />
+          Número de série (pode ficar em branco e ser preenchido depois)
+          <input name="numero_serie" defaultValue={valores.numero_serie ?? ""} placeholder="Como está na etiqueta do aparelho" style={{ textTransform: "uppercase" }} />
         </label>
         <label>
           Onde o aparelho está
@@ -87,6 +87,19 @@ export default function DeviceForm({ acao, valores = {}, rotulo }: { acao: Acao;
             {STATUS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
         </label>
+      </div>
+
+      <div className="linha">
+        <label>
+          Data da negociação (opcional)
+          <input name="data_negociacao" type="date" defaultValue={valores.data_negociacao ?? ""} />
+        </label>
+        {ehGR && (
+          <label>
+            Em nome de (email do GD responsável; em branco = {meuEmail})
+            <input name="responsavel_email" type="email" defaultValue={valores.responsavel_email ?? ""} placeholder="nome.sobrenome@ems.com.br" />
+          </label>
+        )}
       </div>
 
       <h3>Estrutura</h3>

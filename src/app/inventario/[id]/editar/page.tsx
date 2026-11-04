@@ -12,12 +12,12 @@ export default async function EditarDevicePage({ params }: { params: Promise<{ i
   const eu = await usuarioOuLogin();
   const { id } = await params;
   const d = await one<{
-    id: number; tipo: string; numero_serie: string; status: string; distrito: string; setor: string | null; medico_nome: string | null;
+    id: number; tipo: string; numero_serie: string | null; status: string; distrito: string; setor: string | null; medico_nome: string | null;
     medico_crm: string | null; clinica: string | null; endereco: string | null; cidade: string | null; cidade_ibge: string | null; cep: string | null;
-    observacao: string | null; registrado_por: number; registrado_email: string;
-  }>("SELECT * FROM devices WHERE id = $1", [Number(id)]);
+    observacao: string | null; registrado_por: number; registrado_email: string; responsavel_email: string | null; data_negociacao: string | null;
+  }>("SELECT *, data_negociacao::text AS data_negociacao FROM devices WHERE id = $1", [Number(id)]);
   if (!d) notFound();
-  if (eu.papel !== "GR" && d.registrado_por !== eu.id) redirect("/inventario");
+  if (eu.papel !== "GR" && d.registrado_por !== eu.id && d.responsavel_email !== eu.email) redirect("/inventario");
 
   const hist = await q<{ acao: string; email: string; em: string }>(
     "SELECT acao, email, em::text AS em FROM devices_historico WHERE device_id = $1 ORDER BY id DESC LIMIT 10", [d.id]);
@@ -26,10 +26,10 @@ export default async function EditarDevicePage({ params }: { params: Promise<{ i
     <>
       <Topbar usuario={eu} />
       <main className="conteudo">
-        <h1>Editar · {DEVICE_NOME[d.tipo] ?? d.tipo} {d.numero_serie}</h1>
+        <h1>Editar · {DEVICE_NOME[d.tipo] ?? d.tipo} {d.numero_serie ?? "(série pendente)"}</h1>
         <p className="suave">Registrado por {d.registrado_email}. Alterações ficam em nome de <b>{eu.email}</b>.</p>
         <div className="card">
-          <DeviceForm acao={atualizarDevice} valores={d} rotulo="Salvar alterações" />
+          <DeviceForm acao={atualizarDevice} valores={{ ...d, data_negociacao: d.data_negociacao ? String(d.data_negociacao).slice(0, 10) : null }} rotulo="Salvar alterações" ehGR={eu.papel === "GR"} meuEmail={eu.email} />
         </div>
         {hist.length > 0 && (
           <div className="card">

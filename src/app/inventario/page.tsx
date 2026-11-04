@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Topbar from "@/components/Topbar";
-import { usuarioOuLogin, fmtDataHora } from "@/lib/pagina";
+import { usuarioOuLogin, fmtDataHora, fmtData } from "@/lib/pagina";
+import { nomeDoEmail } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { DEVICES, DEVICE_NOME, DEVICE_IMAGEM, STATUS, STATUS_LABEL, fmtCep } from "@/lib/devices";
 import { nomeDistrito } from "@/lib/estrutura";
@@ -10,7 +11,7 @@ import { excluirDevice } from "@/app/actions";
 export const dynamic = "force-dynamic";
 
 type Linha = {
-  id: number; tipo: string; numero_serie: string; status: string; distrito: string; setor: string | null;
+  id: number; tipo: string; numero_serie: string | null; status: string; distrito: string; setor: string | null; responsavel_email: string | null; data_negociacao: string | null;
   medico_nome: string | null; medico_crm: string | null; clinica: string | null;
   endereco: string | null; cidade: string | null; cep: string | null; observacao: string | null;
   registrado_email: string; registrado_nome: string; atualizado_em: string; atualizado_email: string | null;
@@ -26,16 +27,16 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   const cond: string[] = [];
   const params: unknown[] = [];
   // GD e Staff enxergam somente o que registraram com o proprio email; o GR enxerga tudo.
-  if (!ehGR) { params.push(eu.id); cond.push(`d.registrado_por = $${params.length}`); }
+  if (!ehGR) { params.push(eu.id); params.push(eu.email); cond.push(`(d.registrado_por = $${params.length - 1} OR d.responsavel_email = $${params.length})`); }
   if (sp.tipo) { params.push(sp.tipo); cond.push(`d.tipo = $${params.length}`); }
   if (sp.status) { params.push(sp.status); cond.push(`d.status = $${params.length}`); }
-  if (ehGR && sp.quem) { params.push(Number(sp.quem)); cond.push(`d.registrado_por = $${params.length}`); }
+  if (ehGR && sp.quem) { params.push(sp.quem); cond.push(`COALESCE(d.responsavel_email, d.registrado_email) = $${params.length}`); }
   if (sp.distrito) { params.push(sp.distrito); cond.push(`d.distrito = $${params.length}`); }
   if (sp.cidade) { params.push(sp.cidade); cond.push(`d.cidade_ibge = $${params.length}`); }
   const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
 
   const linhas = await q<Linha>(`
-    SELECT d.*, u.nome AS registrado_nome, d.atualizado_em::text AS atualizado_em
+    SELECT d.*, u.nome AS registrado_nome, d.atualizado_em::text AS atualizado_em, d.data_negociacao::text AS data_negociacao
     FROM devices d JOIN usuarios u ON u.id = d.registrado_por
     ${where}
     ORDER BY d.distrito, d.tipo, d.numero_serie
@@ -49,10 +50,9 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     ? await q<{ distrito: string; n: string }>("SELECT distrito, COUNT(*)::text AS n FROM devices GROUP BY distrito ORDER BY distrito")
     : [];
   const porPessoa = ehGR
-    ? await q<{ id: number; nome: string; email: string; n: string }>(
-        `SELECT u.id, u.nome, u.email, COUNT(d.id)::text AS n FROM usuarios u
-         LEFT JOIN devices d ON d.registrado_por = u.id
-         WHERE u.ativo AND u.papel IN ('GD','STAFF') GROUP BY u.id ORDER BY u.nome`)
+    ? await q<{ email: string; n: string }>(
+        `SELECT COALESCE(d.responsavel_email, d.registrado_email) AS email, COUNT(*)::text AS n FROM devices d
+         GROUP BY 1 ORDER BY 1`)
     : [];
   const cont = (tipo: string, status?: string) =>
     resumo.filter((r) => r.tipo === tipo && (!status || r.status === status)).reduce((a, r) => a + Number(r.n), 0);
@@ -117,11 +117,11 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
             )}
             {porPessoa.length > 0 && (
               <>
-                <h3>Registros por pessoa (quem logou e registrou)</h3>
+                <h3>Aparelhos por GD responsável</h3>
                 <div className="filtros" style={{ margin: 0 }}>
                   {porPessoa.map((p) => (
-                    <Link key={p.id} href={link({ quem: String(p.id) })} className={sp.quem === String(p.id) ? "ativo" : ""} title={p.email}>
-                      {p.nome}: {p.n}
+                    <Link key={p.email} href={link({ quem: sp.quem === p.email ? undefined : p.email })} className={sp.quem === p.email ? "ativo" : ""} title={p.email}>
+                      {nomeDoEmail(p.email)}: {p.n}
                     </Link>
                   ))}
                 </div>
@@ -149,7 +149,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                 <img className="thumb" src={DEVICE_IMAGEM[d.tipo]} alt={DEVICE_NOME[d.tipo] ?? d.tipo} />
                 <div>
                   <div className="titulo">
-                    {DEVICE_NOME[d.tipo] ?? d.tipo} <span className="serie">{d.numero_serie}</span>
+                    {DEVICE_NOME[d.tipo] ?? d.tipo} {d.numero_serie ? <span className="serie">{d.numero_serie}</span> : <span className="badge pendente">série pendente</span>}
                     <span className={`badge ${d.status}`}>{STATUS_LABEL[d.status] ?? d.status}</span>
                   </div>
                   {(d.medico_nome || d.clinica) && (
@@ -166,7 +166,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                   {d.observacao && <div className="meta"><span>{d.observacao}</span></div>}
                   <div className="meta rodape">
                     <span><b>{nomeDistrito(d.distrito)}</b>{d.setor ? ` · Setor ${d.setor}` : ""}</span>
-                    <span>GD: {d.registrado_nome} ({d.registrado_email})</span>
+                    <span>GD: {d.responsavel_email ? `${nomeDoEmail(d.responsavel_email)} (${d.responsavel_email})` : `${d.registrado_nome} (${d.registrado_email})`}{d.responsavel_email ? ` · registrado por ${d.registrado_email}` : ""}</span>
+                    {d.data_negociacao && <span>Negociado em {fmtData(d.data_negociacao)}</span>}
                     <span>Atualizado em {fmtDataHora(d.atualizado_em)}{d.atualizado_email && d.atualizado_email !== d.registrado_email ? ` por ${d.atualizado_email}` : ""}</span>
                   </div>
                 </div>
