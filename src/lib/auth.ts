@@ -80,10 +80,16 @@ export async function usuarioAtual(): Promise<Usuario | null> {
     const { payload } = await jwtVerify(token, secret());
     const uid = Number(payload.uid);
     if (!uid) return null;
-    return await one<Usuario>(
+    const u = await one<Usuario>(
       "SELECT id, nome, email, papel, ativo FROM usuarios WHERE id = $1 AND ativo = TRUE",
       [uid]
     );
+    // Emails em ADMIN_EMAILS sao sempre Gerente Regional, mesmo que a variavel tenha mudado depois do login.
+    if (u && u.papel !== "GR" && adminEmails().includes(u.email)) {
+      await one("UPDATE usuarios SET papel = 'GR' WHERE id = $1", [u.id]);
+      u.papel = "GR";
+    }
+    return u;
   } catch {
     return null;
   }
