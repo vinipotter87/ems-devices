@@ -19,15 +19,16 @@ type Linha = {
 
 const OK: Record<string, string> = { criado: "Registro criado.", alterado: "Registro atualizado.", excluido: "Registro excluído." };
 
-export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ tipo?: string; status?: string; quem?: string; distrito?: string; cidade?: string; ok?: string }> }) {
+export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ tipo?: string; status?: string; quem?: string; distrito?: string; cidade?: string; ok?: string; todos?: string }> }) {
   const eu = await usuarioOuLogin();
   const sp = await searchParams;
   const ehGR = eu.papel === "GR";
+  const verTodos = ehGR || sp.todos === "1";
 
   const cond: string[] = [];
   const params: unknown[] = [];
   // GD e Staff enxergam somente o que registraram com o proprio email; o GR enxerga tudo.
-  if (!ehGR) { params.push(eu.id); params.push(eu.email); cond.push(`(d.registrado_por = $${params.length - 1} OR d.responsavel_email = $${params.length})`); }
+  if (!verTodos) { params.push(eu.id); params.push(eu.email); cond.push(`(d.registrado_por = $${params.length - 1} OR d.responsavel_email = $${params.length})`); }
   if (sp.tipo) { params.push(sp.tipo); cond.push(`d.tipo = $${params.length}`); }
   if (sp.status) { params.push(sp.status); cond.push(`d.status = $${params.length}`); }
   if (ehGR && sp.quem) { params.push(sp.quem); cond.push(`COALESCE(d.responsavel_email, d.responsavel_nome, d.registrado_email) = $${params.length}`); }
@@ -60,7 +61,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
 
   const link = (p: Record<string, string | undefined>) => {
     const u = new URLSearchParams();
-    const m = { tipo: sp.tipo, status: sp.status, quem: sp.quem, distrito: sp.distrito, cidade: sp.cidade, ...p };
+    const m = { tipo: sp.tipo, status: sp.status, quem: sp.quem, distrito: sp.distrito, cidade: sp.cidade, todos: sp.todos, ...p };
     for (const [k, v] of Object.entries(m)) if (v) u.set(k, v);
     const qs = u.toString();
     return `/inventario${qs ? "?" + qs : ""}`;
@@ -74,7 +75,10 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           <div>
             <h1>Inventário de devices</h1>
             <p className="suave" style={{ margin: 0 }}>
-              {ehGR ? "Regional · todos os registros" : `Registros feitos com ${eu.email}`}
+              {verTodos ? "Regional · todos os registros" : `Meus registros (${eu.email})`}
+              {!ehGR && (
+                <> · <Link href={link({ todos: verTodos ? undefined : "1" })}>{verTodos ? "ver só os meus" : "ver toda a regional"}</Link></>
+              )}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -140,7 +144,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
 
         {linhas.length === 0 ? (
           <div className="card vazio">
-            Nenhum registro {cond.length > (ehGR ? 0 : 1) ? "com esse filtro" : "ainda"}. <Link href="/inventario/novo">Registrar um aparelho</Link>.
+            Nenhum registro {cond.length > (verTodos ? 0 : 1) ? "com esse filtro" : "ainda"}. <Link href="/inventario/novo">Registrar um aparelho</Link>.
           </div>
         ) : (
           <div className="lista-devices">
@@ -173,13 +177,15 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                     <span>Atualizado em {fmtDataHora(d.atualizado_em)}{d.atualizado_email && d.atualizado_email !== d.registrado_email ? ` por ${d.atualizado_email}` : ""}</span>
                   </div>
                 </div>
-                <div className="acoes-inline">
-                  <Link href={`/inventario/${d.id}/editar`} className="btn secundario pequeno">Editar</Link>
-                  <form action={excluirDevice}>
-                    <input type="hidden" name="id" value={d.id} />
-                    <button type="submit" className="btn perigo pequeno">Excluir</button>
-                  </form>
-                </div>
+                {(ehGR || d.registrado_email === eu.email || d.responsavel_email === eu.email) ? (
+                  <div className="acoes-inline">
+                    <Link href={`/inventario/${d.id}/editar`} className="btn secundario pequeno">Editar</Link>
+                    <form action={excluirDevice}>
+                      <input type="hidden" name="id" value={d.id} />
+                      <button type="submit" className="btn perigo pequeno">Excluir</button>
+                    </form>
+                  </div>
+                ) : <div className="pequeno">somente leitura</div>}
               </div>
             ))}
           </div>
