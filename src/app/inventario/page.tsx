@@ -31,7 +31,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   if (!verTodos) { params.push(eu.id); params.push(eu.email); cond.push(`(d.registrado_por = $${params.length - 1} OR d.responsavel_email = $${params.length})`); }
   if (sp.tipo) { params.push(sp.tipo); cond.push(`d.tipo = $${params.length}`); }
   if (sp.status) { params.push(sp.status); cond.push(`d.status = $${params.length}`); }
-  if (ehGR && sp.quem) { params.push(sp.quem); cond.push(`COALESCE(d.responsavel_email, d.responsavel_nome, d.registrado_email) = $${params.length}`); }
+  if (verTodos && sp.quem) { params.push(sp.quem); cond.push(`COALESCE(d.responsavel_email, d.responsavel_nome, d.registrado_email) = $${params.length}`); }
   if (sp.distrito) { params.push(sp.distrito); cond.push(`d.distrito = $${params.length}`); }
   if (sp.cidade) { params.push(sp.cidade); cond.push(`d.cidade_ibge = $${params.length}`); }
   const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
@@ -50,7 +50,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   const porDistrito = ehGR
     ? await q<{ distrito: string; n: string }>("SELECT distrito, COUNT(*)::text AS n FROM devices GROUP BY distrito ORDER BY distrito")
     : [];
-  const porPessoa = ehGR
+  const porPessoa = verTodos
     ? await q<{ email: string; n: string }>(
         `SELECT COALESCE(d.responsavel_email, d.responsavel_nome, d.registrado_email) AS email, COUNT(*)::text AS n FROM devices d
          GROUP BY 1 ORDER BY 1`)
@@ -89,6 +89,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
         </div>
 
         {sp.ok && OK[sp.ok] && <div className="ok" style={{ marginTop: 12 }}>{OK[sp.ok]}</div>}
+        {sp.quem && <div className="filtros" style={{ marginBottom: 0 }}><Link href={link({ quem: undefined })} className="ativo">GD: {sp.quem.includes("@") ? nomeDoEmail(sp.quem) : sp.quem} ✕</Link></div>}
         {sp.cidade && <div className="filtros" style={{ marginBottom: 0 }}><Link href={link({ cidade: undefined })} className="ativo">Cidade: {CIDADE_POR_IBGE[sp.cidade]?.rotulo ?? sp.cidade} ✕</Link></div>}
 
         {ehGR && (
@@ -120,18 +121,20 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                 </div>
               </>
             )}
-            {porPessoa.length > 0 && (
-              <>
-                <h3>Aparelhos por GD responsável</h3>
-                <div className="filtros" style={{ margin: 0 }}>
-                  {porPessoa.map((p) => (
-                    <Link key={p.email} href={link({ quem: sp.quem === p.email ? undefined : p.email })} className={sp.quem === p.email ? "ativo" : ""} title={p.email}>
-                      {p.email.includes("@") ? nomeDoEmail(p.email) : p.email}: {p.n}
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
+          </div>
+        )}
+
+        {porPessoa.length > 0 && (
+          <div className="card" style={{ marginTop: 14 }}>
+            <h2>Filtrar por GD</h2>
+            <p className="pequeno" style={{ margin: "0 0 8px" }}>Clique no nome para ver tudo o que está no nome daquele GD. Clique de novo para limpar.</p>
+            <div className="filtros" style={{ margin: 0 }}>
+              {porPessoa.map((p) => (
+                <Link key={p.email} href={link({ quem: sp.quem === p.email ? undefined : p.email })} className={sp.quem === p.email ? "ativo" : ""} title={p.email}>
+                  {p.email.includes("@") ? nomeDoEmail(p.email) : p.email}: {p.n}
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 
